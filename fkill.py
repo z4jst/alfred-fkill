@@ -7,7 +7,7 @@ import signal
 import subprocess
 import sys
 from dataclasses import dataclass
-from typing import List, Optional, Set
+from typing import Iterable, List, Optional, Set
 
 
 @dataclass(frozen=True)
@@ -43,6 +43,49 @@ class Process:
         parts.extend(app_bundle_names(self.command))
         return " ".join(part for part in parts if part)
 
+    @property
+    def is_app_process(self) -> bool:
+        return bool(app_bundle_paths(self.command))
+
+    @property
+    def is_primary_app_process(self) -> bool:
+        paths = app_bundle_paths(self.command)
+        if len(paths) != 1:
+            return False
+        bundle_name = normalize_app_name(os.path.basename(paths[0]))
+        executable_prefix = f"{paths[0]}/Contents/MacOS/"
+        if not self.command.startswith(executable_prefix):
+            return False
+        executable_tail = self.command[len(executable_prefix) :].strip()
+        if not bundle_name or not executable_tail:
+            return False
+        normalized_tail = normalize_app_name(executable_tail)
+        if any(marker in normalized_tail for marker in (" helper", " renderer", " service")):
+            return False
+        if not normalized_tail.startswith(bundle_name):
+            return False
+        if len(normalized_tail) == len(bundle_name):
+            return True
+        return normalized_tail[len(bundle_name)].isspace()
+
+    @property
+    def is_user_app_process(self) -> bool:
+        paths = app_bundle_paths(self.command)
+        return self.is_primary_app_process and bool(paths) and paths[0].startswith("/Applications/")
+
+    def matches_app_name(self, app_name: str, require_primary: bool = True) -> bool:
+        normalized = normalize_app_name(app_name)
+        if not normalized:
+            return False
+        if require_primary and not self.is_primary_app_process:
+            return False
+        names = [self.display_name, self.executable_name]
+        names.extend(app_bundle_names(self.command))
+        return any(normalize_app_name(name) == normalized for name in names)
+
+    def matches_any_app_name(self, app_names: Iterable[str]) -> bool:
+        return any(self.matches_app_name(app_name) for app_name in app_names)
+
 
 def app_bundle_paths(command: str) -> List[str]:
     paths = []
@@ -61,6 +104,71 @@ def app_bundle_names(command: str) -> List[str]:
         slash_index = path.rfind("/")
         names.append(path[slash_index + 1 :] if slash_index != -1 else path)
     return names
+
+
+def normalize_app_name(name: str) -> str:
+    name = os.path.basename(name.strip())
+    if name.casefold().endswith(".app"):
+        name = name[:-4]
+    return name.casefold()
+
+
+def resource_score(process: Process) -> float:
+    return process.cpu + process.mem
+
+
+def sort_processes(
+    processes: List[Process],
+    foreground_app: Optional[str] = None,
+    visible_apps: Optional[Set[str]] = None,
+) -> List[Process]:
+    visible_apps = visible_apps or set()
+
+    def sort_key(process: Process):
+        if foreground_app and process.matches_app_name(foreground_app):
+            group_rank = 0
+        elif process.is_primary_app_process and process.matches_any_app_name(visible_apps):
+            group_rank = 1
+        elif process.is_user_app_process:
+            group_rank = 2
+        else:
+            group_rank = 3
+        return (group_rank, -resource_score(process), process.display_name.casefold(), process.pid)
+
+    return sorted(processes, key=sort_key)
+
+
+def foreground_app_name() -> Optional[str]:
+    script = 'tell application "System Events" to get name of first application process whose frontmost is true'
+    try:
+        result = subprocess.run(
+            ["/usr/bin/osascript", "-e", script],
+            check=True,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            timeout=1,
+        )
+    except (subprocess.SubprocessError, OSError):
+        return None
+    name = result.stdout.strip()
+    return name or None
+
+
+def visible_app_names() -> Set[str]:
+    script = 'tell application "System Events" to get name of every application process whose background only is false'
+    try:
+        result = subprocess.run(
+            ["/usr/bin/osascript", "-e", script],
+            check=True,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            timeout=1,
+        )
+    except (subprocess.SubprocessError, OSError):
+        return set()
+    return {name.strip() for name in result.stdout.split(",") if name.strip()}
 
 
 def list_processes() -> List[Process]:
@@ -126,9 +234,15 @@ def script_filter_json(
     processes: List[Process],
     query: str,
     current_pid: Optional[int] = None,
+    foreground_app: Optional[str] = None,
+    visible_apps: Optional[Set[str]] = None,
 ) -> str:
     query = query.strip()
-    matches = filter_processes(killable_processes(processes, current_pid), query)
+    matches = sort_processes(
+        filter_processes(killable_processes(processes, current_pid), query),
+        foreground_app=foreground_app,
+        visible_apps=visible_apps,
+    )
     items = []
 
     if query and matches:
@@ -192,7 +306,15 @@ def main(argv: List[str]) -> int:
 
     try:
         if command == "filter":
-            print(script_filter_json(list_processes(), argument, current_pid=os.getpid()))
+            print(
+                script_filter_json(
+                    list_processes(),
+                    argument,
+                    current_pid=os.getpid(),
+                    foreground_app=foreground_app_name(),
+                    visible_apps=visible_app_names(),
+                )
+            )
             return 0
         if command == "kill":
             print(kill_selection(argument))
