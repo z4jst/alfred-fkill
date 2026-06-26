@@ -5,7 +5,7 @@
 	<key>bundleid</key>
 	<string>com.z4jst.alfred.fkill</string>
 	<key>category</key>
-	<string>Productivity</string>
+	<string>Tools</string>
 	<key>connections</key>
 	<dict>
 		<key>F1C8D9A1-9D34-4F5A-B3E2-38B97F9E7F11</key>
@@ -23,7 +23,7 @@
 		</array>
 	</dict>
 	<key>createdby</key>
-	<string>Open Source Contributors</string>
+	<string>z4jst</string>
 	<key>description</key>
 	<string>List running processes and force kill matching processes from Alfred.</string>
 	<key>disabled</key>
@@ -60,7 +60,7 @@
 				<key>runningsubtext</key>
 				<string>Listing running processes...</string>
 				<key>script</key>
-				<string>./fkill.py filter "$1"</string>
+				<string>./run_fkill.sh filter "$1"</string>
 				<key>scriptargtype</key>
 				<integer>1</integer>
 				<key>scriptfile</key>
@@ -93,7 +93,7 @@
 				<key>escaping</key>
 				<integer>102</integer>
 				<key>script</key>
-				<string>result="$(./fkill.py kill "$1" 2&gt;&amp;1)"
+				<string>result="$(./run_fkill.sh kill "$1" 2&gt;&amp;1)"
 status=$?
 /usr/bin/osascript - "$result" &lt;&lt;'OSA'
 on run argv
@@ -141,7 +141,7 @@ Press Return on the first item to force kill all matching processes, or choose a
 		</dict>
 	</dict>
 	<key>version</key>
-	<string>1.0.0</string>
+	<string>1.0.2</string>
 	<key>webaddress</key>
 	<string></string>
 </dict>

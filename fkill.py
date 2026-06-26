@@ -7,6 +7,7 @@ import signal
 import subprocess
 import sys
 from dataclasses import dataclass
+from typing import List, Optional, Set
 
 
 @dataclass(frozen=True)
@@ -26,7 +27,7 @@ class Process:
         return self.executable_name or f"PID {self.pid}"
 
     @property
-    def icon_path(self) -> str | None:
+    def icon_path(self) -> Optional[str]:
         app_paths = app_bundle_paths(self.command)
         return app_paths[-1] if app_paths else None
 
@@ -43,7 +44,7 @@ class Process:
         return " ".join(part for part in parts if part)
 
 
-def app_bundle_paths(command: str) -> list[str]:
+def app_bundle_paths(command: str) -> List[str]:
     paths = []
     search_start = 0
     while True:
@@ -54,7 +55,7 @@ def app_bundle_paths(command: str) -> list[str]:
         search_start = app_index + len(".app")
 
 
-def app_bundle_names(command: str) -> list[str]:
+def app_bundle_names(command: str) -> List[str]:
     names = []
     for path in app_bundle_paths(command):
         slash_index = path.rfind("/")
@@ -62,7 +63,7 @@ def app_bundle_names(command: str) -> list[str]:
     return names
 
 
-def list_processes() -> list[Process]:
+def list_processes() -> List[Process]:
     result = subprocess.run(
         ["/bin/ps", "-axo", "pid=,ppid=,user=,%cpu=,%mem=,command="],
         check=True,
@@ -73,7 +74,7 @@ def list_processes() -> list[Process]:
     return [process for line in result.stdout.splitlines() if (process := parse_ps_line(line))]
 
 
-def parse_ps_line(line: str) -> Process | None:
+def parse_ps_line(line: str) -> Optional[Process]:
     parts = line.strip().split(None, 5)
     if len(parts) < 6:
         return None
@@ -91,7 +92,7 @@ def parse_ps_line(line: str) -> Process | None:
         return None
 
 
-def protected_pids(processes: list[Process], current_pid: int) -> set[int]:
+def protected_pids(processes: List[Process], current_pid: int) -> Set[int]:
     protected = {1, current_pid}
     current_process = next((process for process in processes if process.pid == current_pid), None)
     if current_process:
@@ -99,7 +100,7 @@ def protected_pids(processes: list[Process], current_pid: int) -> set[int]:
     return protected
 
 
-def killable_processes(processes: list[Process], current_pid: int | None = None) -> list[Process]:
+def killable_processes(processes: List[Process], current_pid: Optional[int] = None) -> List[Process]:
     current_pid = current_pid if current_pid is not None else os.getpid()
     protected = protected_pids(processes, current_pid)
     return [
@@ -109,7 +110,7 @@ def killable_processes(processes: list[Process], current_pid: int | None = None)
     ]
 
 
-def filter_processes(processes: list[Process], query: str) -> list[Process]:
+def filter_processes(processes: List[Process], query: str) -> List[Process]:
     normalized_query = query.strip().casefold()
     candidates = killable_processes(processes)
     if not normalized_query:
@@ -122,9 +123,9 @@ def filter_processes(processes: list[Process], query: str) -> list[Process]:
 
 
 def script_filter_json(
-    processes: list[Process],
+    processes: List[Process],
     query: str,
-    current_pid: int | None = None,
+    current_pid: Optional[int] = None,
 ) -> str:
     query = query.strip()
     matches = filter_processes(killable_processes(processes, current_pid), query)
@@ -166,7 +167,7 @@ def script_filter_json(
     return json.dumps({"items": items}, ensure_ascii=False)
 
 
-def kill_selection(selection: str, processes: list[Process] | None = None) -> str:
+def kill_selection(selection: str, processes: Optional[List[Process]] = None) -> str:
     selection = selection.strip()
     processes = processes if processes is not None else list_processes()
 
@@ -185,7 +186,7 @@ def kill_selection(selection: str, processes: list[Process] | None = None) -> st
     raise ValueError(f"Unknown selection: {selection}")
 
 
-def main(argv: list[str]) -> int:
+def main(argv: List[str]) -> int:
     command = argv[1] if len(argv) > 1 else "filter"
     argument = argv[2] if len(argv) > 2 else ""
 
