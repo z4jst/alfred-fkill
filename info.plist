@@ -40,7 +40,7 @@
 				<key>alfredfiltersresultsmatchmode</key>
 				<integer>0</integer>
 				<key>argumenttreatemptyqueryasnil</key>
-				<false/>
+				<true/>
 				<key>argumenttrimmode</key>
 				<integer>0</integer>
 				<key>argumenttype</key>
@@ -68,13 +68,13 @@
 				<key>skipuniversalaction</key>
 				<true/>
 				<key>subtext</key>
-				<string>Type a process name or PID, then press Return to force kill.</string>
+				<string>Type a process name or press Space to list running processes.</string>
 				<key>title</key>
-				<string>Force kill process</string>
+				<string>fkill</string>
 				<key>type</key>
-				<integer>7</integer>
+				<integer>11</integer>
 				<key>withspace</key>
-				<false/>
+				<true/>
 			</dict>
 			<key>inboundconfig</key>
 			<dict/>
@@ -141,7 +141,7 @@ Press Return on the first item to force kill all matching processes, or choose a
 		</dict>
 	</dict>
 	<key>version</key>
-	<string>1.0.3</string>
+	<string>1.0.7</string>
 	<key>webaddress</key>
 	<string></string>
 </dict>

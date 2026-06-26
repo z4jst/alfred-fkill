@@ -20,21 +20,37 @@ class MetadataTests(unittest.TestCase):
         self.assertEqual(metadata["category"], "Tools")
         self.assertEqual(metadata["createdby"], "z4jst")
 
-    def test_script_filter_uses_launcher_not_python_shebang(self):
+    def script_filters(self):
         root = Path(__file__).resolve().parents[1]
         with (root / "info.plist").open("rb") as plist:
             metadata = plistlib.load(plist)
+        return [
+            item
+            for item in metadata["objects"]
+            if item["type"] == "alfred.workflow.input.scriptfilter"
+        ]
 
-        script_filter = metadata["objects"][0]
-        self.assertEqual(script_filter["config"]["script"], './run_fkill.sh filter "$1"')
+    def test_script_filters_use_launcher_not_python_shebang(self):
+        scripts = {item["config"]["script"] for item in self.script_filters()}
 
-    def test_script_filter_runs_without_requiring_a_trailing_space(self):
-        root = Path(__file__).resolve().parents[1]
-        with (root / "info.plist").open("rb") as plist:
-            metadata = plistlib.load(plist)
+        self.assertEqual(len(scripts), 1)
+        self.assertIn('./run_fkill.sh filter "$1"', scripts)
 
-        script_filter = metadata["objects"][0]
-        self.assertFalse(script_filter["config"]["withspace"])
+    def test_script_filter_matches_axe_keyword_entry_pattern(self):
+        query_filter = next(
+            item
+            for item in self.script_filters()
+            if item["config"]["script"] == './run_fkill.sh filter "$1"'
+        )
+
+        self.assertEqual(query_filter["config"]["keyword"], "fkill")
+        self.assertTrue(query_filter["config"]["withspace"])
+        self.assertEqual(query_filter["config"]["argumenttype"], 1)
+        self.assertTrue(query_filter["config"]["argumenttreatemptyqueryasnil"])
+
+    def test_script_filters_run_as_zsh(self):
+        for script_filter in self.script_filters():
+            self.assertEqual(script_filter["config"]["type"], 11)
 
     def test_package_contains_launcher_and_icon(self):
         root = Path(__file__).resolve().parents[1]
