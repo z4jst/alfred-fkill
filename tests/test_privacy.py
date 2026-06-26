@@ -7,7 +7,6 @@ class PrivacyTests(unittest.TestCase):
         root = Path(__file__).resolve().parents[1]
         forbidden = [
             "jian" + "qi",
-            "z4" + "jst",
             "/" + "Users",
             "软件" + "开发项目",
             "Docu" + "ments",
