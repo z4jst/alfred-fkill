@@ -28,6 +28,14 @@ class MetadataTests(unittest.TestCase):
         script_filter = metadata["objects"][0]
         self.assertEqual(script_filter["config"]["script"], './run_fkill.sh filter "$1"')
 
+    def test_script_filter_runs_without_requiring_a_trailing_space(self):
+        root = Path(__file__).resolve().parents[1]
+        with (root / "info.plist").open("rb") as plist:
+            metadata = plistlib.load(plist)
+
+        script_filter = metadata["objects"][0]
+        self.assertFalse(script_filter["config"]["withspace"])
+
     def test_package_contains_launcher_and_icon(self):
         root = Path(__file__).resolve().parents[1]
         package = root / "dist" / "fkill.alfredworkflow"
